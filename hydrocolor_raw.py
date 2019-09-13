@@ -14,6 +14,7 @@ import numpy as np
 from sys import argv
 from matplotlib import pyplot as plt
 from spectacle import io, calibrate, analyse, spectral
+from astropy import table
 
 # Get the data folder from the command line
 path_water, path_sky, path_card, path_calibration = io.path_from_input(argv)
@@ -123,26 +124,29 @@ plt.show()
 def R_RS(L_t, L_s, L_c, rho=0.028, R_ref=0.18):
     return (L_t - rho * L_s) / ((np.pi / R_ref) * L_c)
 
-sky_mean = sky_cut.mean(axis=(1,2))
-card_mean = card_cut.mean(axis=(1,2))
+def RGBG2_to_RGB(array):
+    return [array[0].ravel(), array[1::2].ravel(), array[2].ravel()]
 
-water_RRS = R_RS(water_cut, sky_mean[:,np.newaxis,np.newaxis], card_mean[:,np.newaxis,np.newaxis])
+# Flatten lists and combine G and G2
+water_RGB = RGBG2_to_RGB(water_cut)
+sky_RGB = RGBG2_to_RGB(sky_cut)
+card_RGB = RGBG2_to_RGB(card_cut)
 
-# Histogram of remote sensing reflectances per channel
-xmin, xmax = analyse.symmetric_percentiles(water_RRS)
-bins = np.linspace(xmin, xmax, 50)
-data_channels = [water_RRS.ravel(), water_RRS[0].ravel(), water_RRS[1::2].ravel(), water_RRS[2].ravel()]
-fig, axs = plt.subplots(nrows=4, figsize=(7,4), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex=True, sharey=True, squeeze=True)
-for ax, data, c in zip(axs, data_channels, "krgb"):
-    ax.hist(data, bins=bins, color=c)
-    ax.grid(True, ls="--", alpha=0.7)
-axs[-1].set_xlabel("Remote sensing reflectance [sr$^{-1}$]")
-plt.show()
+water_mean = np.array([rgb.mean() for rgb in water_RGB])
+sky_mean = np.array([rgb.mean() for rgb in sky_RGB])
+card_mean = np.array([rgb.mean() for rgb in card_RGB])
 
-# Calculate the mean R_Rs in the RGB bands
-RRS_RGB = [water_RRS[0].ravel(), water_RRS[1::2].ravel(), water_RRS[2].ravel()]
-RRS_mean = np.array([R_rs.mean() for R_rs in RRS_RGB])
-RRS_std = np.array([R_rs.std() for R_rs in RRS_RGB])
+water_std = np.array([rgb.std() for rgb in water_RGB])
+sky_std = np.array([rgb.std() for rgb in sky_RGB])
+card_std = np.array([rgb.std() for rgb in card_RGB])
+
+R_rs = R_RS(water_mean, sky_mean, card_mean)
+
+R_rs_err_water = water_std**2 * ((0.18/np.pi) * card_mean**-1)**2
+R_rs_err_sky = sky_std**2 * ((0.18/np.pi) * 0.028 * card_mean**-1)**2
+R_rs_err_card = card_std**2 * ((0.18/np.pi) * (water_mean - 0.028 * sky_mean) * card_mean**-2)**2
+
+R_rs_err = np.sqrt(R_rs_err_water + R_rs_err_sky + R_rs_err_card)
 
 # Find the effective wavelength corresponding to the RGB bands
 spectral_response = calibrate.load_spectral_response(root)
@@ -157,9 +161,48 @@ effective_bandwidths = np.trapz(RGB_responses_normalised, x=wavelengths, axis=1)
 
 plt.figure(figsize=(3,3), tight_layout=True)
 for j, c in enumerate("rgb"):
-    plt.errorbar(RGB_wavelengths[j], RRS_mean[j], xerr=effective_bandwidths[j]/2, yerr=RRS_std[j], c=c, fmt="o")
+    plt.errorbar(RGB_wavelengths[j], R_rs[j], xerr=effective_bandwidths[j]/2, yerr=R_rs_err[j], c=c, fmt="o")
 plt.xlabel("Wavelength [nm]")
 plt.ylabel("Remote sensing reflectance [sr$^{-1}$]")
 plt.xlim(390, 700)
-plt.ylim(ymin=0)
+plt.ylim(0, 0.05)
+plt.yticks([0, 0.01, 0.02, 0.03, 0.04, 0.05])
+plt.grid(ls="--")
+plt.show()
+
+# TEMPORARY for SoRad plot
+
+wavelengths = np.arange(320, 955, 3.3)
+
+def convert_row(row):
+    row_split = row.split(";")
+    start = row_split[:-1]
+    end = np.array(row_split[-1].split(","), dtype=np.float32).tolist()
+    row_final = start + end
+    return row_final
+
+with open("/disks/strw1/burggraaff/hydrocolor/So-Rad_Rrs_Balaton2019.csv") as file:
+    data = file.readlines()
+    header = data[0]
+    data = data[1:]
+    cols = header.split(";")[:-1] + [f"Rrs_{wvl:.1f}" for wvl in wavelengths]
+
+    rows = [convert_row(row) for row in data]
+    dtypes = ["S30" for h in header.split(";")[:-1]] + [np.float32 for wvl in wavelengths]
+
+    data = table.Table(rows=rows, names=cols, dtype=dtypes)
+
+Rrs = np.array([data[f"Rrs_{wvl:.1f}"][26266] for wvl in wavelengths])
+
+plt.figure(figsize=(3,3), tight_layout=True)
+for j, c in enumerate("rgb"):
+    plt.errorbar(RGB_wavelengths[j], R_rs[j], xerr=effective_bandwidths[j]/2, yerr=R_rs_err[j], c=c, fmt="o")
+plt.plot(wavelengths, Rrs, c='k')
+plt.xlabel("Wavelength [nm]")
+plt.ylabel("Remote sensing reflectance [sr$^{-1}$]")
+plt.xlim(390, 700)
+plt.ylim(0, 0.055)
+plt.yticks([0, 0.01, 0.02, 0.03, 0.04, 0.05])
+plt.grid(ls="--")
+plt.savefig("comparison.pdf")
 plt.show()
