@@ -31,29 +31,11 @@ print("Loaded metadata")
 water_raw = io.load_raw_image(path_water)
 sky_raw = io.load_raw_image(path_sky)
 card_raw = io.load_raw_image(path_card)
-
-# Histograms of raw data
-bins = np.linspace(0, camera.saturation, 500)
-fig, axs = plt.subplots(nrows=3, figsize=(7,2), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex=True, sharey=True, squeeze=True)
-for ax, data, label in zip(axs, [water_raw, sky_raw, card_raw], ["Water", "Sky", "Grey card"]):
-    ax.hist(data.ravel(), bins=bins, color="k")
-    ax.set_title(label)
-    ax.grid(True, ls="--", alpha=0.7)
-axs[-1].set_xlabel("Raw data (ADU)")
-plt.show()
+print("Loaded RAW data")
 
 # Correct for bias
 water_bias, sky_bias, card_bias = calibrate.correct_bias(root, water_raw, sky_raw, card_raw)
-
-# Histograms of corrected data
-bins = np.linspace(0, camera.saturation, 500)
-fig, axs = plt.subplots(nrows=3, figsize=(7,2), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex=True, sharey=True, squeeze=True)
-for ax, data, label in zip(axs, [water_bias, sky_bias, card_bias], ["Water", "Sky", "Grey card"]):
-    ax.hist(data.ravel(), bins=bins, color="k")
-    ax.set_title(label)
-    ax.grid(True, ls="--", alpha=0.7)
-axs[-1].set_xlabel("Bias-corrected data (ADU)")
-plt.show()
+print("Corrected bias")
 
 # Normalising for ISO speed is not necessary since this is a relative measurement
 
@@ -61,19 +43,11 @@ plt.show()
 
 # Correct for flat-field
 water_flat, sky_flat, card_flat = calibrate.correct_flatfield(root, water_bias, sky_bias, card_bias)
-
-# Histograms of flat-fielded data
-bins = np.linspace(0, camera.saturation, 500)
-fig, axs = plt.subplots(nrows=3, figsize=(7,2), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex=True, sharey=True, squeeze=True)
-for ax, data, label in zip(axs, [water_flat, sky_flat, card_flat], ["Water", "Sky", "Grey card"]):
-    ax.hist(data.ravel(), bins=bins, color="k")
-    ax.set_title(label)
-    ax.grid(True, ls="--", alpha=0.7)
-axs[-1].set_xlabel("Flat field-corrected data (a.u.)")
-plt.show()
+print("Corrected flat-field")
 
 # Demosaick the data
 water_RGBG, sky_RGBG, card_RGBG = camera.demosaick(water_flat, sky_flat, card_flat)
+print("Demosaicked")
 
 # Select the central 100x100 pixels
 central_x, central_y = water_RGBG.shape[1]//2, water_RGBG.shape[2]//2
@@ -83,16 +57,7 @@ central_slice = np.s_[:, central_x-half_box:central_x+half_box+1, central_y-half
 water_cut = water_RGBG[central_slice]
 sky_cut = sky_RGBG[central_slice]
 card_cut = card_RGBG[central_slice]
-
-# Histograms of sliced data
-bins = np.linspace(0, camera.saturation, 500)
-fig, axs = plt.subplots(nrows=3, figsize=(7,2), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex=True, sharey=True, squeeze=True)
-for ax, data, label in zip(axs, [water_cut, sky_cut, card_cut], ["Water", "Sky", "Grey card"]):
-    ax.hist(data.ravel(), bins=bins, color="k")
-    ax.set_title(label)
-    ax.grid(True, ls="--", alpha=0.7)
-axs[-1].set_xlabel("Corrected/Selected data (a.u.)")
-plt.show()
+print(f"Selected central {box_size}x{box_size} pixels")
 
 # Combined histograms of different data reduction steps
 water_all = [water_raw, water_bias, water_flat, water_cut]
@@ -135,18 +100,25 @@ card_RGB = RGBG2_to_RGB(card_cut)
 water_mean = np.array([rgb.mean() for rgb in water_RGB])
 sky_mean = np.array([rgb.mean() for rgb in sky_RGB])
 card_mean = np.array([rgb.mean() for rgb in card_RGB])
+print("Calculated mean values per channel")
 
 water_std = np.array([rgb.std() for rgb in water_RGB])
 sky_std = np.array([rgb.std() for rgb in sky_RGB])
 card_std = np.array([rgb.std() for rgb in card_RGB])
 
 R_rs = R_RS(water_mean, sky_mean, card_mean)
+print("Calculated remote sensing reflectances")
+
 
 R_rs_err_water = water_std**2 * ((0.18/np.pi) * card_mean**-1)**2
 R_rs_err_sky = sky_std**2 * ((0.18/np.pi) * 0.028 * card_mean**-1)**2
 R_rs_err_card = card_std**2 * ((0.18/np.pi) * (water_mean - 0.028 * sky_mean) * card_mean**-2)**2
 
 R_rs_err = np.sqrt(R_rs_err_water + R_rs_err_sky + R_rs_err_card)
+print("Calculated error in remote sensing reflectances")
+
+for R, R_err, c in zip(R_rs, R_rs_err, "RGB"):
+    print(f"{c}: R_rs = {R:.3f} +- {R_err:.3f} sr^-1")
 
 # Find the effective wavelength corresponding to the RGB bands
 spectral_response = calibrate.load_spectral_response(root)
@@ -192,7 +164,7 @@ with open("/disks/strw1/burggraaff/hydrocolor/So-Rad_Rrs_Balaton2019.csv") as fi
 
     data = table.Table(rows=rows, names=cols, dtype=dtypes)
 
-Rrs = np.array([data[f"Rrs_{wvl:.1f}"][26266] for wvl in wavelengths])
+Rrs = np.array([data[f"Rrs_{wvl:.1f}"][26230] for wvl in wavelengths])
 
 plt.figure(figsize=(3,3), tight_layout=True)
 for j, c in enumerate("rgb"):
@@ -201,8 +173,8 @@ plt.plot(wavelengths, Rrs, c='k')
 plt.xlabel("Wavelength [nm]")
 plt.ylabel("Remote sensing reflectance [sr$^{-1}$]")
 plt.xlim(390, 700)
-plt.ylim(0, 0.055)
-plt.yticks([0, 0.01, 0.02, 0.03, 0.04, 0.05])
+plt.ylim(0, 0.07)
+plt.yticks(np.arange(0, 0.071, 0.01))
 plt.grid(ls="--")
-plt.savefig("comparison.pdf")
+plt.savefig("comparison_raw.pdf")
 plt.show()
