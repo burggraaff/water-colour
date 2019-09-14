@@ -11,20 +11,20 @@ from spectacle import io, calibrate, spectral
 from astropy import table
 
 # Get the data folder from the command line
-path_water, path_sky, path_card, path_calibration = io.path_from_input(argv)
-root = io.find_root_folder(path_calibration)
+folder, calibration_folder = io.path_from_input(argv)
 
 # Get metadata
-camera = io.load_metadata(root)
+camera = io.load_metadata(calibration_folder)
 print("Loaded metadata")
 
 # ISO speed and exposure time are assumed equal between all three images and
 # thus can be ignored
 
 # Load data
-water_jpeg = io.load_jpg_image(path_water)
-sky_jpeg = io.load_jpg_image(path_sky)
-card_jpeg = io.load_jpg_image(path_card)
+water_path, sky_path, card_path = [folder/(photo + ".JPG") for photo in ("water", "sky", "greycard")]
+water_jpeg = io.load_jpg_image(water_path)
+sky_jpeg = io.load_jpg_image(sky_path)
+card_jpeg = io.load_jpg_image(card_path)
 print("Loaded JPEG data")
 
 # Select the central 100x100 pixels
@@ -49,7 +49,7 @@ water_all = [water_jpeg, water_cut]
 sky_all = [sky_jpeg, sky_cut]
 card_all = [card_jpeg, card_cut]
 
-fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(6,4), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex="col", sharey="col")
+fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(9,4), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex="col", sharey="col")
 
 for ax_col, water, sky, card in zip(axs.T, water_all, sky_all, card_all):
     data_combined = np.ravel([water, sky, card])
@@ -59,6 +59,10 @@ for ax_col, water, sky, card in zip(axs.T, water_all, sky_all, card_all):
         ax.hist(data.ravel(), bins=bins, color="k")
         ax.set_xlim(0, 255)
         ax.grid(True, ls="--", alpha=0.7)
+
+for ax, image in zip(axs[:,-1], [water_jpeg, sky_jpeg, card_jpeg]):
+    ax.imshow(image)
+    ax.tick_params(bottom=False, labelbottom=False)
 
 for ax in axs.ravel():
     ax.tick_params(left=False, labelleft=False)
@@ -96,7 +100,7 @@ for R, R_err, c in zip(R_rs, R_rs_err, "RGB"):
     print(f"{c}: R_rs = {R:.3f} +- {R_err:.3f} sr^-1")
 
 # Find the effective wavelength corresponding to the RGB bands
-spectral_response = calibrate.load_spectral_response(root)
+spectral_response = calibrate.load_spectral_response(calibration_folder)
 wavelengths = spectral_response[0]
 RGB_responses = spectral_response[1:4]
 RGB_wavelengths = spectral.effective_wavelengths(wavelengths, RGB_responses)

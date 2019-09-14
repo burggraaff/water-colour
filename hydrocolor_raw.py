@@ -17,24 +17,24 @@ from spectacle import io, calibrate, analyse, spectral
 from astropy import table
 
 # Get the data folder from the command line
-path_water, path_sky, path_card, path_calibration = io.path_from_input(argv)
-root = io.find_root_folder(path_calibration)
+folder, calibration_folder = io.path_from_input(argv)
 
 # Get metadata
-camera = io.load_metadata(root)
+camera = io.load_metadata(calibration_folder)
 print("Loaded metadata")
 
 # ISO speed and exposure time are assumed equal between all three images and
 # thus can be ignored
 
 # Load data
-water_raw = io.load_raw_image(path_water)
-sky_raw = io.load_raw_image(path_sky)
-card_raw = io.load_raw_image(path_card)
+water_path, sky_path, card_path = [folder/(photo + camera.image.raw_extension) for photo in ("water", "sky", "greycard")]
+water_raw = io.load_raw_image(water_path)
+sky_raw = io.load_raw_image(sky_path)
+card_raw = io.load_raw_image(card_path)
 print("Loaded RAW data")
 
 # Correct for bias
-water_bias, sky_bias, card_bias = calibrate.correct_bias(root, water_raw, sky_raw, card_raw)
+water_bias, sky_bias, card_bias = calibrate.correct_bias(calibration_folder, water_raw, sky_raw, card_raw)
 print("Corrected bias")
 
 # Normalising for ISO speed is not necessary since this is a relative measurement
@@ -42,7 +42,7 @@ print("Corrected bias")
 # Dark current is negligible
 
 # Correct for flat-field
-water_flat, sky_flat, card_flat = calibrate.correct_flatfield(root, water_bias, sky_bias, card_bias)
+water_flat, sky_flat, card_flat = calibrate.correct_flatfield(calibration_folder, water_bias, sky_bias, card_bias)
 print("Corrected flat-field")
 
 # Demosaick the data
@@ -121,7 +121,7 @@ for R, R_err, c in zip(R_rs, R_rs_err, "RGB"):
     print(f"{c}: R_rs = {R:.3f} +- {R_err:.3f} sr^-1")
 
 # Find the effective wavelength corresponding to the RGB bands
-spectral_response = calibrate.load_spectral_response(root)
+spectral_response = calibrate.load_spectral_response(calibration_folder)
 wavelengths = spectral_response[0]
 RGB_responses = spectral_response[1:4]
 RGB_wavelengths = spectral.effective_wavelengths(wavelengths, RGB_responses)
