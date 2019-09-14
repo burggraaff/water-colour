@@ -33,6 +33,12 @@ sky_raw = io.load_raw_image(sky_path)
 card_raw = io.load_raw_image(card_path)
 print("Loaded RAW data")
 
+# Load thumbnails
+water_jpeg = io.load_jpg_image(water_path)
+sky_jpeg = io.load_jpg_image(sky_path)
+card_jpeg = io.load_jpg_image(card_path)
+print("Loaded JPEG thumbnails")
+
 # Correct for bias
 water_bias, sky_bias, card_bias = calibrate.correct_bias(calibration_folder, water_raw, sky_raw, card_raw)
 print("Corrected bias")
@@ -64,25 +70,29 @@ water_all = [water_raw, water_bias, water_flat, water_cut]
 sky_all = [sky_raw, sky_bias, sky_flat, sky_cut]
 card_all = [card_raw, card_bias, card_flat, card_cut]
 
-fig, axs = plt.subplots(nrows=3, ncols=4, figsize=(12,4), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex="col", sharey="col")
+fig, axs = plt.subplots(nrows=3, ncols=5, figsize=(11,4), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex="col", sharey="col")
 
-for ax_col, water, sky, card in zip(axs.T, water_all, sky_all, card_all):
+for ax_col, water, sky, card in zip(axs[:,1:].T, water_all, sky_all, card_all):
     data_combined = np.ravel([water, sky, card])
     xmin, xmax = analyse.symmetric_percentiles(data_combined, percent=0.001)
-    bins = np.linspace(xmin, xmax, 100)
+    bins = np.linspace(xmin, xmax, 150)
 
     for ax, data in zip(ax_col, [water, sky, card]):
         ax.hist(data.ravel(), bins=bins, color="k")
         ax.set_xlim(xmin, xmax)
         ax.grid(True, ls="--", alpha=0.7)
 
+for ax, img in zip(axs[:,0], [water_jpeg, sky_jpeg, card_jpeg]):
+    ax.imshow(img)
+    ax.tick_params(bottom=False, labelbottom=False)
 for ax in axs.ravel():
     ax.tick_params(left=False, labelleft=False)
 for ax, label in zip(axs[:,0], ["Water", "Sky", "Grey card"]):
     ax.set_ylabel(label)
-for ax, title in zip(axs[0], ["Raw", "Bias-corrected", "Flat-fielded", "Central slice"]):
+for ax, title in zip(axs[0], ["Image", "Raw", "Bias-corrected", "Flat-fielded", "Central slice"]):
     ax.set_title(title)
 
+plt.savefig(folder/"statistics_raw.pdf")
 plt.show()
 
 # Convert to remote sensing reflectances
