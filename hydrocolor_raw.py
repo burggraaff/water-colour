@@ -15,6 +15,7 @@ from sys import argv
 from matplotlib import pyplot as plt
 from spectacle import io, calibrate, analyse, spectral
 from astropy import table
+from datetime import datetime
 
 # Get the data folder from the command line
 folder, calibration_folder = io.path_from_input(argv)
@@ -151,3 +152,17 @@ plt.ylim(0, 0.05)
 plt.yticks([0, 0.01, 0.02, 0.03, 0.04, 0.05])
 plt.grid(ls="--")
 plt.show()
+
+# Create a timestamp
+time = folder.parents[0].stem[3:]
+hour, minute = time[:2], time[3:]
+date = folder.parents[2].stem
+year, month, day = date[:4], date[4:6], date[6:]
+year, month, day, hour, minute = [int(x) for x in (year, month, day, hour, minute)]
+timestamp = datetime(year, month, day, hour, minute, second=0)
+timestamp_iso = timestamp.isoformat()
+
+# Write the result to file
+result = table.Table(rows=[[timestamp_iso, *R_rs, *R_rs_err]], names=["UTC", "R_rs (R)", "R_rs (G)", "R_rs (B)", "R_rs_err (R)", "R_rs_err (G)", "R_rs_err (B)"])
+save_to = folder.parent / (folder.stem + "_raw.csv")
+result.write(save_to, format="ascii.fast_csv")
