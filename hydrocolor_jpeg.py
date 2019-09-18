@@ -9,6 +9,7 @@ from sys import argv
 from matplotlib import pyplot as plt
 from spectacle import io, calibrate, spectral
 from astropy import table
+from datetime import datetime
 
 # Get the data folder from the command line
 folder, calibration_folder = io.path_from_input(argv)
@@ -51,7 +52,7 @@ card_all = [card_jpeg, card_cut]
 
 fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(9,4), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex="col", sharey="col")
 
-for ax_col, water, sky, card in zip(axs.T, water_all, sky_all, card_all):
+for ax_col, water, sky, card in zip(axs.T[1:], water_all, sky_all, card_all):
     data_combined = np.ravel([water, sky, card])
     bins = np.linspace(0, 255, 100)
 
@@ -60,7 +61,7 @@ for ax_col, water, sky, card in zip(axs.T, water_all, sky_all, card_all):
         ax.set_xlim(0, 255)
         ax.grid(True, ls="--", alpha=0.7)
 
-for ax, image in zip(axs[:,-1], [water_jpeg, sky_jpeg, card_jpeg]):
+for ax, image in zip(axs[:,0], [water_jpeg, sky_jpeg, card_jpeg]):
     ax.imshow(image)
     ax.tick_params(bottom=False, labelbottom=False)
 
@@ -68,9 +69,10 @@ for ax in axs.ravel():
     ax.tick_params(left=False, labelleft=False)
 for ax, label in zip(axs[:,0], ["Water", "Sky", "Grey card"]):
     ax.set_ylabel(label)
-for ax, title in zip(axs[0], ["JPEG (full)", "Central slice"]):
+for ax, title in zip(axs[0], ["Image", "JPEG (full)", "Central slice"]):
     ax.set_title(title)
 
+plt.savefig(folder/"statistics_jpeg.pdf")
 plt.show()
 
 # Convert to remote sensing reflectances
@@ -121,39 +123,16 @@ plt.yticks([0, 0.01, 0.02, 0.03, 0.04, 0.05])
 plt.grid(ls="--")
 plt.show()
 
-# TEMPORARY for SoRad plot
+# Create a timestamp
+time = folder.parents[0].stem[3:]
+hour, minute = time[:2], time[3:]
+date = folder.parents[2].stem
+year, month, day = date[:4], date[4:6], date[6:]
+year, month, day, hour, minute = [int(x) for x in (year, month, day, hour, minute)]
+timestamp = datetime(year, month, day, hour, minute, second=0)
+timestamp_iso = timestamp.isoformat()
 
-wavelengths = np.arange(320, 955, 3.3)
-
-def convert_row(row):
-    row_split = row.split(";")
-    start = row_split[:-1]
-    end = np.array(row_split[-1].split(","), dtype=np.float32).tolist()
-    row_final = start + end
-    return row_final
-
-with open("/disks/strw1/burggraaff/hydrocolor/So-Rad_Rrs_Balaton2019.csv") as file:
-    data = file.readlines()
-    header = data[0]
-    data = data[1:]
-    cols = header.split(";")[:-1] + [f"Rrs_{wvl:.1f}" for wvl in wavelengths]
-
-    rows = [convert_row(row) for row in data]
-    dtypes = ["S30" for h in header.split(";")[:-1]] + [np.float32 for wvl in wavelengths]
-
-    data = table.Table(rows=rows, names=cols, dtype=dtypes)
-
-Rrs = np.array([data[f"Rrs_{wvl:.1f}"][26230] for wvl in wavelengths])
-
-plt.figure(figsize=(3,3), tight_layout=True)
-for j, c in enumerate("rgb"):
-    plt.errorbar(RGB_wavelengths[j], R_rs[j], xerr=effective_bandwidths[j]/2, yerr=R_rs_err[j], c=c, fmt="o")
-plt.plot(wavelengths, Rrs, c='k')
-plt.xlabel("Wavelength [nm]")
-plt.ylabel("Remote sensing reflectance [sr$^{-1}$]")
-plt.xlim(390, 700)
-plt.ylim(0, 0.07)
-plt.yticks(np.arange(0, 0.071, 0.01))
-plt.grid(ls="--")
-plt.savefig("comparison_jpeg.pdf")
-plt.show()
+# Write the result to file
+result = table.Table(rows=[[timestamp_iso, *R_rs, *R_rs_err]], names=["UTC", "R_rs (R)", "R_rs (G)", "R_rs (B)", "R_rs_err (R)", "R_rs_err (G)", "R_rs_err (B)"])
+save_to = folder.parent / (folder.stem + "_jpeg.csv")
+result.write(save_to, format="ascii.fast_csv")
