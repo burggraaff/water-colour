@@ -34,6 +34,11 @@ sky_raw = io.load_raw_image(sky_path)
 card_raw = io.load_raw_image(card_path)
 print("Loaded RAW data")
 
+# Load EXIF data
+water_exif = io.load_exif(water_path)
+sky_exif = io.load_exif(sky_path)
+card_exif = io.load_exif(card_path)
+
 # Load thumbnails
 water_jpeg = io.load_jpg_image(water_path)
 sky_jpeg = io.load_jpg_image(sky_path)
