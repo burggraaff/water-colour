@@ -20,7 +20,6 @@ from os import walk
 
 # Get the data folder from the command line
 calibration_folder, *folders = io.path_from_input(argv)
-
 pattern = calibration_folder.stem
 
 # Get metadata
