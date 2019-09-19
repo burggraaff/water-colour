@@ -39,3 +39,8 @@ data_combined = table.vstack(all_data)
 data_combined.sort("UTC")
 
 print(data_combined)
+
+save_to = folders[0].parent / f"combined_{pattern}"
+
+data_combined.write(save_to, format="ascii.fast_csv")
+print(f"Saved results to {save_to}")
