@@ -51,10 +51,15 @@ for folder_main in folders:
         card_exif = io.load_exif(card_path)
 
         # Load thumbnails
-        water_jpeg = io.load_jpg_image(water_path)
-        sky_jpeg = io.load_jpg_image(sky_path)
-        card_jpeg = io.load_jpg_image(card_path)
-        print("Loaded JPEG thumbnails")
+        try:
+            water_jpeg = io.load_jpg_image(water_path)
+        except OSError:
+            water_jpeg = sky_jpeg = card_jpeg = np.tile(np.nan, water_raw.shape)
+            print("No JPEG thumbnails available")
+        else:
+            sky_jpeg = io.load_jpg_image(sky_path)
+            card_jpeg = io.load_jpg_image(card_path)
+            print("Loaded JPEG thumbnails")
 
         # Correct for bias
         water_bias, sky_bias, card_bias = calibrate.correct_bias(calibration_folder, water_raw, sky_raw, card_raw)
@@ -170,14 +175,17 @@ for folder_main in folders:
         plt.show()
 
         # Create a timestamp from EXIF (assume time zone UTC+2)
-        timestamp = water_exif["EXIF DateTimeOriginal"].values
+        try:
+            timestamp = water_exif["EXIF DateTimeOriginal"].values
+        except KeyError:
+            timestamp = water_exif["Image DateTimeOriginal"].values
         # Convert to ISO format
         timestamp_ISO = timestamp[:4] + "-" + timestamp[5:7] + "-" + timestamp[8:10] + "T" + timestamp[11:]
         UTC = datetime.fromisoformat(timestamp_ISO)
         UTC = UTC - conversion_to_utc
 
         # Write the result to file
-        result = table.Table(rows=[[UTC.isoformat(), *R_rs, *R_rs_err]], names=["UTC", "R_rs (R)", "R_rs (G)", "R_rs (B)", "R_rs_err (R)", "R_rs_err (G)", "R_rs_err (B)"])
+        result = table.Table(rows=[[UTC.timestamp(), UTC.isoformat(), *R_rs, *R_rs_err]], names=["UTC", "UTC (ISO)", "R_rs (R)", "R_rs (G)", "R_rs (B)", "R_rs_err (R)", "R_rs_err (G)", "R_rs_err (B)"])
         save_to = data_path.parent / (data_path.stem + "_raw.csv")
         result.write(save_to, format="ascii.fast_csv")
 

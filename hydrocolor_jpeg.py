@@ -147,7 +147,7 @@ for folder_main in folders:
         UTC = UTC - conversion_to_utc
 
         # Write the result to file
-        result = table.Table(rows=[[UTC.isoformat(), *R_rs, *R_rs_err]], names=["UTC", "R_rs (R)", "R_rs (G)", "R_rs (B)", "R_rs_err (R)", "R_rs_err (G)", "R_rs_err (B)"])
+        result = table.Table(rows=[[UTC.timestamp(), UTC.isoformat(), *R_rs, *R_rs_err]], names=["UTC", "UTC (ISO)", "R_rs (R)", "R_rs (G)", "R_rs (B)", "R_rs_err (R)", "R_rs_err (G)", "R_rs_err (B)"])
         save_to = data_path.parent / (data_path.stem + "_jpeg.csv")
         result.write(save_to, format="ascii.fast_csv")
 
