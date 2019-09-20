@@ -15,12 +15,14 @@ from sys import argv
 from matplotlib import pyplot as plt
 from spectacle import io, calibrate, analyse, spectral
 from astropy import table
-from datetime import datetime
+from datetime import datetime, timedelta
 from os import walk
 
 # Get the data folder from the command line
 calibration_folder, *folders = io.path_from_input(argv)
 pattern = calibration_folder.stem
+
+conversion_to_utc = timedelta(hours=2)
 
 # Get metadata
 camera = io.load_metadata(calibration_folder)
@@ -167,17 +169,15 @@ for folder_main in folders:
         plt.grid(ls="--")
         plt.show()
 
-        # Create a timestamp
-        time = data_path.parents[0].stem[3:]
-        hour, minute = time[:2], time[3:]
-        date = data_path.parents[2].stem
-        year, month, day = date[:4], date[4:6], date[6:]
-        year, month, day, hour, minute = [int(x) for x in (year, month, day, hour, minute)]
-        timestamp = datetime(year, month, day, hour, minute, second=0)
-        timestamp_iso = timestamp.isoformat()
+        # Create a timestamp from EXIF (assume time zone UTC+2)
+        timestamp = water_exif["EXIF DateTimeOriginal"].values
+        # Convert to ISO format
+        timestamp_ISO = timestamp[:4] + "-" + timestamp[5:7] + "-" + timestamp[8:10] + "T" + timestamp[11:]
+        UTC = datetime.fromisoformat(timestamp_ISO)
+        UTC = UTC - conversion_to_utc
 
         # Write the result to file
-        result = table.Table(rows=[[timestamp_iso, *R_rs, *R_rs_err]], names=["UTC", "R_rs (R)", "R_rs (G)", "R_rs (B)", "R_rs_err (R)", "R_rs_err (G)", "R_rs_err (B)"])
+        result = table.Table(rows=[[UTC.isoformat(), *R_rs, *R_rs_err]], names=["UTC", "R_rs (R)", "R_rs (G)", "R_rs (B)", "R_rs_err (R)", "R_rs_err (G)", "R_rs_err (B)"])
         save_to = data_path.parent / (data_path.stem + "_raw.csv")
         result.write(save_to, format="ascii.fast_csv")
 
