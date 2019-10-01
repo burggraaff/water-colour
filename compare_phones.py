@@ -14,6 +14,7 @@ import numpy as np
 from sys import argv
 from matplotlib import pyplot as plt
 from spectacle import io, calibrate, spectral
+from spectacle.general import RMS
 from astropy import table
 from datetime import datetime
 
@@ -61,3 +62,6 @@ plt.savefig(f"comparison_{phone1_name}_X_{phone2_name}.pdf")
 plt.show()
 
 differences_RGB = table.hstack([data_phone1[f"R_rs ({c})"] - data_phone2[f"R_rs ({c})"] for c in "RGB"])
+RMS_RGB = [RMS(differences_RGB[f"R_rs ({c})"]) for c in "RGB"]
+differences_all = np.ravel([differences_RGB[f"R_rs ({c})"].data for c in "RGB"])
+RMS_all = RMS(differences_all)
