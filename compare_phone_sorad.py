@@ -57,7 +57,8 @@ sorad_datetime = [datetime.fromisoformat(DT) for DT in table_sorad["trigger_id"]
 sorad_timestamps = [dt.timestamp() for dt in sorad_datetime]
 table_sorad.add_column(table.Column(data=sorad_timestamps, name="UTC"))
 
-Rrs = np.array([table_sorad[f"Rrs_{wvl:.1f}"][26350] for wvl in wavelengths])
+data_phone = []
+data_sorad = []
 
 for row in table_phone:
     time_differences = np.abs(table_sorad["UTC"] - row["UTC"])
@@ -67,7 +68,7 @@ for row in table_phone:
         continue
     phone_time = datetime.fromtimestamp(row['UTC']).isoformat()
     sorad_time = datetime.fromtimestamp(table_sorad[closest]["UTC"]).isoformat()
-    print(f"Phone time: {phone_time} ; SoRad time: {sorad_time} ; Difference: {time_diff:.1f} seconds")
+    print(f"Phone time: {phone_time} ; SoRad time: {sorad_time} ; Difference: {time_diff:.1f} seconds ; {table_sorad[closest]['valid']}")
 
     Rrs = np.array([table_sorad[f"Rrs_{wvl:.1f}"][closest] for wvl in wavelengths])
 
@@ -81,6 +82,32 @@ for row in table_phone:
     plt.title(f"iPhone SE; {phone_time}")
     plt.show()
     plt.close()
+
+    data_phone.append(row)
+    data_sorad.append(table_sorad[closest])
+
+data_phone = table.vstack(data_phone)
+data_sorad = table.vstack(data_sorad)
+
+sorad_wavelengths_RGB = [wavelengths[np.abs(wavelengths-wvl).argmin()] for wvl in RGB_wavelengths]
+
+max_val = 0
+
+phone_name = " ".join(path_phone.stem.split("_")[1:-1])
+
+plt.figure(figsize=(5,5), tight_layout=True)
+for j,c in enumerate("RGB"):
+    plt.errorbar(data_phone[f"R_rs ({c})"], data_sorad[f"Rrs_{sorad_wavelengths_RGB[j]:.1f}"], xerr=data_phone[f"R_rs_err ({c})"], yerr=0, color=c, fmt="o")
+    max_val = max(max_val, data_phone[f"R_rs ({c})"].max(), data_sorad[f"Rrs_{sorad_wavelengths_RGB[j]:.1f}"].max())
+plt.plot([-1, 1], [-1, 1], c='k', ls="--")
+plt.xlim(0, 1.05*max_val)
+plt.ylim(0, 1.05*max_val)
+plt.grid(True, ls="--")
+plt.xlabel(phone_name + " $R_{rs}$ [sr$^{-1}$]")
+plt.ylabel("SoRad $R_{rs}$ [sr$^{-1}$]")
+plt.savefig(f"comparison_SoRad_X_{phone_name}.pdf")
+plt.show()
+
 
 #max_val = 0
 #
