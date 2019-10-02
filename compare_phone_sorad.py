@@ -19,6 +19,7 @@ from datetime import datetime
 
 # Get the data folder from the command line
 path_calibration, path_phone, path_sorad = io.path_from_input(argv)
+phone_name = " ".join(path_phone.stem.split("_")[1:-1])
 
 # Find the effective wavelength corresponding to the RGB bands
 spectral_response = calibrate.load_spectral_response(path_calibration)
@@ -57,6 +58,8 @@ sorad_datetime = [datetime.fromisoformat(DT) for DT in table_sorad["trigger_id"]
 sorad_timestamps = [dt.timestamp() for dt in sorad_datetime]
 table_sorad.add_column(table.Column(data=sorad_timestamps, name="UTC"))
 
+table_sorad = table_sorad[26000:27500]
+
 data_phone = []
 data_sorad = []
 
@@ -68,7 +71,9 @@ for row in table_phone:
         continue
     phone_time = datetime.fromtimestamp(row['UTC']).isoformat()
     sorad_time = datetime.fromtimestamp(table_sorad[closest]["UTC"]).isoformat()
-    print(f"Phone time: {phone_time} ; SoRad time: {sorad_time} ; Difference: {time_diff:.1f} seconds ; {table_sorad[closest]['valid']}")
+    print("----")
+    print(f"Phone time: {phone_time} ; SoRad time: {sorad_time} ; Difference: {time_diff:.1f} seconds")
+    print(f"Valid: {table_sorad[closest]['valid']} ; rho: {table_sorad[closest]['rho']}")
 
     Rrs = np.array([table_sorad[f"Rrs_{wvl:.1f}"][closest] for wvl in wavelengths])
 
@@ -80,6 +85,7 @@ for row in table_phone:
     plt.xlim(390, 700)
     plt.ylim(0, 0.07)
     plt.title(f"iPhone SE; {phone_time}")
+    plt.savefig(f"SoRad_comparison/{phone_name}_{phone_time}.pdf")
     plt.show()
     plt.close()
 
@@ -92,8 +98,6 @@ data_sorad = table.vstack(data_sorad)
 sorad_wavelengths_RGB = [wavelengths[np.abs(wavelengths-wvl).argmin()] for wvl in RGB_wavelengths]
 
 max_val = 0
-
-phone_name = " ".join(path_phone.stem.split("_")[1:-1])
 
 plt.figure(figsize=(5,5), tight_layout=True)
 for j,c in enumerate("RGB"):
