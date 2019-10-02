@@ -77,14 +77,16 @@ for row in table_phone:
 
     Rrs = np.array([table_sorad[f"Rrs_{wvl:.1f}"][closest] for wvl in wavelengths])
 
-    plt.figure(figsize=(3,3), tight_layout=True)
+    plt.figure(figsize=(3.3,3.3), tight_layout=True)
     plt.plot(wavelengths, Rrs, c="k")
     for j, c in enumerate("RGB"):
         plt.errorbar(RGB_wavelengths[j], row[f"R_rs ({c})"], xerr=effective_bandwidths[j]/2, yerr=row[f"R_rs_err ({c})"], fmt="o", c=c)
     plt.grid(True, ls="--")
     plt.xlim(390, 700)
+    plt.xlabel("Wavelength [nm]")
     plt.ylim(0, 0.07)
-    plt.title(f"iPhone SE; {phone_time}")
+    plt.ylabel("$R_{rs}$ [sr$^{-1}$]")
+    plt.title(f"{phone_name}\n{phone_time}")
     plt.savefig(f"SoRad_comparison/{phone_name}_{phone_time}.pdf")
     plt.show()
     plt.close()
@@ -101,14 +103,14 @@ max_val = 0
 
 plt.figure(figsize=(5,5), tight_layout=True)
 for j,c in enumerate("RGB"):
-    plt.errorbar(data_phone[f"R_rs ({c})"], data_sorad[f"Rrs_{sorad_wavelengths_RGB[j]:.1f}"], xerr=data_phone[f"R_rs_err ({c})"], yerr=0, color=c, fmt="o")
+    plt.errorbar(data_sorad[f"Rrs_{sorad_wavelengths_RGB[j]:.1f}"], data_phone[f"R_rs ({c})"], xerr=0, yerr=data_phone[f"R_rs_err ({c})"], color=c, fmt="o")
     max_val = max(max_val, data_phone[f"R_rs ({c})"].max(), data_sorad[f"Rrs_{sorad_wavelengths_RGB[j]:.1f}"].max())
 plt.plot([-1, 1], [-1, 1], c='k', ls="--")
 plt.xlim(0, 1.05*max_val)
 plt.ylim(0, 1.05*max_val)
 plt.grid(True, ls="--")
-plt.xlabel(phone_name + " $R_{rs}$ [sr$^{-1}$]")
-plt.ylabel("SoRad $R_{rs}$ [sr$^{-1}$]")
+plt.xlabel("SoRad $R_{rs}$ [sr$^{-1}$]")
+plt.ylabel(phone_name + " $R_{rs}$ [sr$^{-1}$]")
 plt.savefig(f"comparison_SoRad_X_{phone_name}.pdf")
 plt.show()
 
