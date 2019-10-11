@@ -51,9 +51,13 @@ with open(path_sorad) as file:
     cols = header.split(";")[:-1] + [f"Rrs_{wvl:.1f}" for wvl in wavelengths]
 
     rows = [convert_row(row) for row in data]
-    dtypes = ["S30" for h in header.split(";")[:-1]] + [np.float32 for wvl in wavelengths]
+    dtypes = ["S30" for h in header.split(";")[:-3]] + [np.float32, np.float32] + [np.float32 for wvl in wavelengths]
 
     table_sorad = table.Table(rows=rows, names=cols, dtype=dtypes)
+
+    # Subtract offset
+    for wvl in wavelengths:
+        table_sorad[f"Rrs_{wvl:.1f}"] = table_sorad[f"Rrs_{wvl:.1f}"] - table_sorad["offset"]
 
 sorad_datetime = [datetime.fromisoformat(DT) for DT in table_sorad["trigger_id"]]
 sorad_timestamps = [dt.timestamp() for dt in sorad_datetime]
