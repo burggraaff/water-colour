@@ -14,6 +14,7 @@ import numpy as np
 from sys import argv
 from matplotlib import pyplot as plt
 from spectacle import io, calibrate, spectral
+from spectacle.general import RMS
 from astropy import table
 from datetime import datetime
 
@@ -100,9 +101,9 @@ for row in table_phone:
         plt.errorbar(RGB_wavelengths[j], row[f"R_rs ({c})"], xerr=effective_bandwidths[j]/2, yerr=row[f"R_rs_err ({c})"], fmt="o", c=c)
         plt.errorbar(RGB_wavelengths[j], table_sorad[closest][f"Rrs_avg ({c})"], xerr=effective_bandwidths[j]/2, yerr=0, fmt="^", c=c)
     plt.grid(True, ls="--")
-    plt.xlim(390, 700)
+    plt.xlim(200, 900)
     plt.xlabel("Wavelength [nm]")
-    plt.ylim(0, 0.07)
+    plt.ylim(0, 0.15)
     plt.ylabel("$R_{rs}$ [sr$^{-1}$]")
     plt.title(f"{phone_name}\n{phone_time}")
     plt.savefig(f"SoRad_comparison/{phone_name}_{phone_time}.pdf")
@@ -117,6 +118,11 @@ data_sorad = table.vstack(data_sorad)
 
 sorad_wavelengths_RGB = [wavelengths[np.abs(wavelengths-wvl).argmin()] for wvl in RGB_wavelengths]
 
+Rrs_phone = np.hstack([data_phone["R_rs (R)"].data, data_phone["R_rs (G)"].data, data_phone["R_rs (B)"].data])
+Rrs_sorad_averaged = np.hstack([data_sorad["Rrs_avg (R)"].data, data_sorad["Rrs_avg (G)"].data, data_sorad["Rrs_avg (B)"].data])
+rms = RMS(Rrs_phone - Rrs_sorad_averaged)
+r = np.corrcoef(Rrs_phone, Rrs_sorad_averaged)[0, 1]
+
 max_val = 0
 plt.figure(figsize=(5,5), tight_layout=True)
 for j,c in enumerate("RGB"):
@@ -128,5 +134,6 @@ plt.ylim(0, 1.05*max_val)
 plt.grid(True, ls="--")
 plt.xlabel("SoRad $R_{rs}$ [sr$^{-1}$]")
 plt.ylabel(phone_name + " $R_{rs}$ [sr$^{-1}$]")
+plt.title(f"$r$ = {r:.2f}     RMS = {rms:.2f} sr$" + "^{-1}$")
 plt.savefig(f"comparison_SoRad_X_{phone_name}.pdf")
 plt.show()
