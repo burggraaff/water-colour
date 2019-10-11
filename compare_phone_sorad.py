@@ -23,14 +23,14 @@ phone_name = " ".join(path_phone.stem.split("_")[1:-1])
 
 # Find the effective wavelength corresponding to the RGB bands
 spectral_response = calibrate.load_spectral_response(path_calibration)
-wavelengths = spectral_response[0]
+wavelengths_phone = spectral_response[0]
 RGB_responses = spectral_response[1:4]
-RGB_wavelengths = spectral.effective_wavelengths(wavelengths, RGB_responses)
+RGB_wavelengths = spectral.effective_wavelengths(wavelengths_phone, RGB_responses)
 
 # SPECTACLE function for effective bandwidth is currently somewhat broken so we
 # do it ourselves
 RGB_responses_normalised = RGB_responses / RGB_responses.max(axis=1)[:,np.newaxis]
-effective_bandwidths = np.trapz(RGB_responses_normalised, x=wavelengths, axis=1)
+effective_bandwidths = np.trapz(RGB_responses_normalised, x=wavelengths_phone, axis=1)
 
 table_phone = table.Table.read(path_phone)
 
@@ -58,7 +58,24 @@ sorad_datetime = [datetime.fromisoformat(DT) for DT in table_sorad["trigger_id"]
 sorad_timestamps = [dt.timestamp() for dt in sorad_datetime]
 table_sorad.add_column(table.Column(data=sorad_timestamps, name="UTC"))
 
+def average_row(row):
+    Rrs = np.array([row[f"Rrs_{wvl:.1f}"] for wvl in wavelengths])
+    RGB_averaged = []
+
+    for response, c in zip(RGB_responses, "RGB"):
+        response_interpolated = np.interp(wavelengths, wavelengths_phone, response, left=0, right=0)
+        not_nan = np.where(~np.isnan(Rrs))
+        Rrs_avg = np.average(Rrs[not_nan], weights=response_interpolated[not_nan])
+
+        RGB_averaged.append(Rrs_avg)
+
+    return RGB_averaged
+
 table_sorad = table_sorad[26000:27500]
+
+RGB_averaged_all = np.array([average_row(row) for row in table_sorad])
+RGB_averaged_table = table.Table(data=RGB_averaged_all, names=["Rrs_avg (R)", "Rrs_avg (G)", "Rrs_avg (B)"])
+table_sorad = table.hstack([table_sorad, RGB_averaged_table])
 
 data_phone = []
 data_sorad = []
@@ -81,6 +98,7 @@ for row in table_phone:
     plt.plot(wavelengths, Rrs, c="k")
     for j, c in enumerate("RGB"):
         plt.errorbar(RGB_wavelengths[j], row[f"R_rs ({c})"], xerr=effective_bandwidths[j]/2, yerr=row[f"R_rs_err ({c})"], fmt="o", c=c)
+        plt.errorbar(RGB_wavelengths[j], table_sorad[closest][f"Rrs_avg ({c})"], xerr=effective_bandwidths[j]/2, yerr=0, fmt="^", c=c)
     plt.grid(True, ls="--")
     plt.xlim(390, 700)
     plt.xlabel("Wavelength [nm]")
@@ -100,11 +118,10 @@ data_sorad = table.vstack(data_sorad)
 sorad_wavelengths_RGB = [wavelengths[np.abs(wavelengths-wvl).argmin()] for wvl in RGB_wavelengths]
 
 max_val = 0
-
 plt.figure(figsize=(5,5), tight_layout=True)
 for j,c in enumerate("RGB"):
-    plt.errorbar(data_sorad[f"Rrs_{sorad_wavelengths_RGB[j]:.1f}"], data_phone[f"R_rs ({c})"], xerr=0, yerr=data_phone[f"R_rs_err ({c})"], color=c, fmt="o")
-    max_val = max(max_val, data_phone[f"R_rs ({c})"].max(), data_sorad[f"Rrs_{sorad_wavelengths_RGB[j]:.1f}"].max())
+    plt.errorbar(data_sorad[f"Rrs_avg ({c})"], data_phone[f"R_rs ({c})"], xerr=0, yerr=data_phone[f"R_rs_err ({c})"], color=c, fmt="o")
+    max_val = max(max_val, data_phone[f"R_rs ({c})"].max(), data_sorad[f"Rrs_avg ({c})"].max())
 plt.plot([-1, 1], [-1, 1], c='k', ls="--")
 plt.xlim(0, 1.05*max_val)
 plt.ylim(0, 1.05*max_val)
@@ -113,18 +130,3 @@ plt.xlabel("SoRad $R_{rs}$ [sr$^{-1}$]")
 plt.ylabel(phone_name + " $R_{rs}$ [sr$^{-1}$]")
 plt.savefig(f"comparison_SoRad_X_{phone_name}.pdf")
 plt.show()
-
-
-#max_val = 0
-#
-#plt.figure(figsize=(5,5), tight_layout=True)
-#for c in "RGB":
-#    plt.errorbar(table_raw[f"R_rs ({c})"], table_jpeg[f"R_rs ({c})"], xerr=table_raw[f"R_rs_err ({c})"], yerr=table_jpeg[f"R_rs_err ({c})"], color=c, fmt="o")
-#    max_val = max(max_val, table_raw[f"R_rs ({c})"].max(), table_jpeg[f"R_rs ({c})"].max())
-#plt.plot([-1, 1], [-1, 1], c='k', ls="--")
-#plt.xlim(0, 1.05*max_val)
-#plt.ylim(0, 1.05*max_val)
-#plt.grid(True, ls="--")
-#plt.xlabel("RAW $R_{rs}$ [sr$^{-1}$]")
-#plt.ylabel("JPEG $R_{rs}$ [sr$^{-1}$]")
-#plt.show()
