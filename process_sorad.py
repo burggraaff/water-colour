@@ -1,6 +1,9 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from astropy import table
+from sys import argv
+
+folder = argv[1]
 
 wavelengths = np.arange(320, 955, 3.3)
 
@@ -11,7 +14,7 @@ def convert_row(row):
     row_final = start + end
     return row_final
 
-with open("/disks/strw1/burggraaff/hydrocolor/So-Rad_Rrs_Balaton2019.csv") as file:
+with open(f"{folder}/So-Rad_Rrs_Balaton2019.csv") as file:
     data = file.readlines()
     header = data[0]
     data = data[1:]

@@ -1,8 +1,11 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from astropy import table
+from sys import argv
 
-data = table.Table.read("/disks/strw1/burggraaff/hydrocolor/Data_Monocle2019_L5All.csv", format="ascii.csv")
+filename = argv[1]
+
+data = table.Table.read(filename, format="ascii.csv")
 
 wavelengths = np.arange(323.3, 953.7, 3.3)
 Rrs = np.array([data[f"Rrs_{wvl:.1f}"][1236] for wvl in wavelengths])
