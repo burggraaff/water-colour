@@ -26,14 +26,14 @@ with open(f"{folder}/So-Rad_Rrs_Balaton2019.csv") as file:
     data = table.Table(rows=rows, names=cols, dtype=dtypes)
 
 
-Rrs = np.array([data[f"Rrs_{wvl:.1f}"][26350] for wvl in wavelengths])
+Rrs = np.array([[row[f"Rrs_{wvl:.1f}"] for wvl in wavelengths] for row in data[::100]]).T
 
-plt.figure(figsize=(3,3), tight_layout=True)
-plt.plot(wavelengths, Rrs)
+plt.figure(figsize=(6,3), tight_layout=True)
+plt.plot(wavelengths, Rrs, c="k", alpha=0.1)
 plt.xlabel("Wavelength [nm]")
 plt.ylabel("Remote sensing reflectance [sr$^{-1}$]")
-plt.xlim(390, 700)
-plt.ylim(0, 0.05)
-plt.yticks([0, 0.01, 0.02, 0.03, 0.04, 0.05])
+plt.xlim(320, 955)
+plt.ylim(0, 0.1)
+plt.yticks(np.arange(0, 0.12, 0.02))
 plt.grid(ls="--")
 plt.show()
