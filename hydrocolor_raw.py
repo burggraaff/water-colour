@@ -116,6 +116,9 @@ for folder_main in folders:
 
         plt.savefig(data_path/"statistics_raw.pdf")
         plt.show()
+        plt.close()
+
+        print("Saved statistics plot")
 
         # Convert to remote sensing reflectances
         def R_RS(L_t, L_s, L_c, rho=0.028, R_ref=0.18):
