@@ -52,14 +52,14 @@ for folder_main in folders:
 
         # Load thumbnails
         try:
-            water_jpeg = io.load_jpg_image(water_path)
+            water_jpeg = io.load_raw_image_postprocessed(water_path, half_size=True, user_flip=0)
         except OSError:
             water_jpeg = sky_jpeg = card_jpeg = np.tile(np.nan, water_raw.shape)
             print("No JPEG thumbnails available")
         else:
-            sky_jpeg = io.load_jpg_image(sky_path)
-            card_jpeg = io.load_jpg_image(card_path)
-            print("Loaded JPEG thumbnails")
+            sky_jpeg = io.load_raw_image_postprocessed(sky_path, half_size=True, user_flip=0)
+            card_jpeg = io.load_raw_image_postprocessed(card_path, half_size=True, user_flip=0)
+            print("Created JPEG thumbnails")
 
         # Correct for bias
         water_bias, sky_bias, card_bias = calibrate.correct_bias(calibration_folder, water_raw, sky_raw, card_raw)
