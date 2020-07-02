@@ -18,11 +18,11 @@ from astropy import table
 from datetime import datetime, timedelta
 from os import walk
 
+from wk import hydrocolor as hc
+
 # Get the data folder from the command line
 calibration_folder, *folders = io.path_from_input(argv)
 pattern = calibration_folder.stem
-
-conversion_to_utc = timedelta(hours=2)
 
 # Get metadata
 camera = io.load_metadata(calibration_folder)
@@ -39,27 +39,16 @@ for folder_main in folders:
             continue
 
         # Load data
-        water_path, sky_path, card_path = [data_path/(photo + camera.image.raw_extension) for photo in ("water", "sky", "greycard")]
-        water_raw = io.load_raw_image(water_path)
-        sky_raw = io.load_raw_image(sky_path)
-        card_raw = io.load_raw_image(card_path)
+        water_path, sky_path, card_path = hc.generate_paths(data_path, camera.image.raw_extension)
+        water_raw, sky_raw, card_raw = hc.load_raw_images(water_path, sky_path, card_path)
         print("Loaded RAW data")
 
         # Load EXIF data
-        water_exif = io.load_exif(water_path)
-        sky_exif = io.load_exif(sky_path)
-        card_exif = io.load_exif(card_path)
+        water_exif, sky_exif, card_exif = hc.load_exif(water_path, sky_path, card_path)
 
         # Load thumbnails
-        try:
-            water_jpeg = io.load_raw_image_postprocessed(water_path, half_size=True, user_flip=0)
-        except OSError:
-            water_jpeg = sky_jpeg = card_jpeg = np.tile(np.nan, water_raw.shape)
-            print("No JPEG thumbnails available")
-        else:
-            sky_jpeg = io.load_raw_image_postprocessed(sky_path, half_size=True, user_flip=0)
-            card_jpeg = io.load_raw_image_postprocessed(card_path, half_size=True, user_flip=0)
-            print("Created JPEG thumbnails")
+        water_jpeg, sky_jpeg, card_jpeg = hc.load_raw_thumbnails(water_path, sky_path, card_path)
+        print("Created JPEG thumbnails")
 
         # Correct for bias
         water_bias, sky_bias, card_bias = calibrate.correct_bias(calibration_folder, water_raw, sky_raw, card_raw)
@@ -77,60 +66,18 @@ for folder_main in folders:
         water_RGBG, sky_RGBG, card_RGBG = camera.demosaick(water_flat, sky_flat, card_flat)
         print("Demosaicked")
 
-        # Select the central 100x100 pixels
-        central_x, central_y = water_RGBG.shape[1]//2, water_RGBG.shape[2]//2
-        box_size = 100
-        half_box = box_size // 2
-        central_slice = np.s_[:, central_x-half_box:central_x+half_box+1, central_y-half_box:central_y+half_box+1]
-        water_cut = water_RGBG[central_slice]
-        sky_cut = sky_RGBG[central_slice]
-        card_cut = card_RGBG[central_slice]
-        print(f"Selected central {box_size}x{box_size} pixels")
+        # Select the central pixels
+        water_cut, sky_cut, card_cut = hc.central_slice_raw(water_RGBG, sky_RGBG, card_RGBG)
 
         # Combined histograms of different data reduction steps
-        water_all = [water_raw, water_bias, water_flat, water_cut]
-        sky_all = [sky_raw, sky_bias, sky_flat, sky_cut]
-        card_all = [card_raw, card_bias, card_flat, card_cut]
+        water_all = [water_jpeg, water_raw, water_bias, water_flat, water_cut]
+        sky_all = [sky_jpeg, sky_raw, sky_bias, sky_flat, sky_cut]
+        card_all = [card_jpeg, card_raw, card_bias, card_flat, card_cut]
 
-        fig, axs = plt.subplots(nrows=3, ncols=5, figsize=(11,4), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex="col", sharey="col")
-
-        for ax_col, water, sky, card in zip(axs[:,1:].T, water_all, sky_all, card_all):
-            data_combined = np.ravel([water, sky, card])
-            xmin, xmax = analyse.symmetric_percentiles(data_combined, percent=0.001)
-            bins = np.linspace(xmin, xmax, 150)
-
-            for ax, data in zip(ax_col, [water, sky, card]):
-                ax.hist(data.ravel(), bins=bins, color="k")
-                ax.set_xlim(xmin, xmax)
-                ax.grid(True, ls="--", alpha=0.7)
-
-        for ax, img in zip(axs[:,0], [water_jpeg, sky_jpeg, card_jpeg]):
-            ax.imshow(img)
-            ax.tick_params(bottom=False, labelbottom=False)
-        for ax in axs.ravel():
-            ax.tick_params(left=False, labelleft=False)
-        for ax, label in zip(axs[:,0], ["Water", "Sky", "Grey card"]):
-            ax.set_ylabel(label)
-        for ax, title in zip(axs[0], ["Image", "Raw", "Bias-corrected", "Flat-fielded", "Central slice"]):
-            ax.set_title(title)
-
-        plt.savefig(data_path/"statistics_raw.pdf")
-        plt.show()
-        plt.close()
-
-        print("Saved statistics plot")
-
-        # Convert to remote sensing reflectances
-        def R_RS(L_t, L_s, L_c, rho=0.028, R_ref=0.18):
-            return (L_t - rho * L_s) / ((np.pi / R_ref) * L_c)
-
-        def RGBG2_to_RGB(array):
-            return [array[0].ravel(), array[1::2].ravel(), array[2].ravel()]
+        hc.histogram_raw(water_all, sky_all, card_all, saveto=data_path/"statistics_raw.pdf")
 
         # Flatten lists and combine G and G2
-        water_RGB = RGBG2_to_RGB(water_cut)
-        sky_RGB = RGBG2_to_RGB(sky_cut)
-        card_RGB = RGBG2_to_RGB(card_cut)
+        water_RGB, sky_RGB, card_RGB = hc.RGBG2_to_RGB(water_cut, sky_cut, card_cut)
 
         water_mean = np.array([rgb.mean() for rgb in water_RGB])
         sky_mean = np.array([rgb.mean() for rgb in sky_RGB])
@@ -140,56 +87,30 @@ for folder_main in folders:
         water_std = np.array([rgb.std() for rgb in water_RGB])
         sky_std = np.array([rgb.std() for rgb in sky_RGB])
         card_std = np.array([rgb.std() for rgb in card_RGB])
+        print("Calculated standard deviations per channel")
 
-        R_rs = R_RS(water_mean, sky_mean, card_mean)
+        # Convert to remote sensing reflectances
+        R_rs = hc.R_RS(water_mean, sky_mean, card_mean)
         print("Calculated remote sensing reflectances")
 
-
-        R_rs_err_water = water_std**2 * ((0.18/np.pi) * card_mean**-1)**2
-        R_rs_err_sky = sky_std**2 * ((0.18/np.pi) * 0.028 * card_mean**-1)**2
-        R_rs_err_card = card_std**2 * ((0.18/np.pi) * (water_mean - 0.028 * sky_mean) * card_mean**-2)**2
-
-        R_rs_err = np.sqrt(R_rs_err_water + R_rs_err_sky + R_rs_err_card)
+        R_rs_err = hc.R_RS_error(water_mean, sky_mean, card_mean, water_std, sky_std, card_std)
         print("Calculated error in remote sensing reflectances")
 
         for R, R_err, c in zip(R_rs, R_rs_err, "RGB"):
             print(f"{c}: R_rs = {R:.3f} +- {R_err:.3f} sr^-1")
 
         # Find the effective wavelength corresponding to the RGB bands
-        spectral_response = calibrate.load_spectral_response(calibration_folder)
-        wavelengths = spectral_response[0]
-        RGB_responses = spectral_response[1:4]
-        RGB_wavelengths = spectral.effective_wavelengths(wavelengths, RGB_responses)
+        RGB_wavelengths = hc.effective_wavelength(calibration_folder)
 
         # SPECTACLE function for effective bandwidth is currently somewhat broken so we
         # do it ourselves
-        RGB_responses_normalised = RGB_responses / RGB_responses.max(axis=1)[:,np.newaxis]
-        effective_bandwidths = np.trapz(RGB_responses_normalised, x=wavelengths, axis=1)
+        effective_bandwidths = hc.effective_bandwidth(calibration_folder)
 
-        plt.figure(figsize=(3,3), tight_layout=True)
-        for j, c in enumerate("rgb"):
-            plt.errorbar(RGB_wavelengths[j], R_rs[j], xerr=effective_bandwidths[j]/2, yerr=R_rs_err[j], c=c, fmt="o")
-        plt.xlabel("Wavelength [nm]")
-        plt.ylabel("Remote sensing reflectance [sr$^{-1}$]")
-        plt.xlim(390, 700)
-        plt.ylim(0, 0.05)
-        plt.yticks([0, 0.01, 0.02, 0.03, 0.04, 0.05])
-        plt.grid(ls="--")
-        plt.show()
+        # Plot the result
+        hc.plot_R_rs(RGB_wavelengths, R_rs, effective_bandwidths, R_rs_err)
 
         # Create a timestamp from EXIF (assume time zone UTC+2)
-        try:
-            timestamp = water_exif["EXIF DateTimeOriginal"].values
-        except KeyError:
-            timestamp = water_exif["Image DateTimeOriginal"].values
-        # Convert to ISO format
-        timestamp_ISO = timestamp[:4] + "-" + timestamp[5:7] + "-" + timestamp[8:10] + "T" + timestamp[11:]
-        UTC = datetime.fromisoformat(timestamp_ISO)
-        UTC = UTC - conversion_to_utc
+        UTC = hc.UTC_timestamp(water_exif)
 
         # Write the result to file
-        result = table.Table(rows=[[UTC.timestamp(), UTC.isoformat(), *R_rs, *R_rs_err]], names=["UTC", "UTC (ISO)", "R_rs (R)", "R_rs (G)", "R_rs (B)", "R_rs_err (R)", "R_rs_err (G)", "R_rs_err (B)"])
-        save_to = data_path.parent / (data_path.stem + "_raw.csv")
-        result.write(save_to, format="ascii.fast_csv")
-
-        print(f"Saved results to {save_to}")
+        hc.write_R_rs(UTC, R_rs, R_rs_err, saveto=data_path.parent / (data_path.stem + "_raw.csv"))

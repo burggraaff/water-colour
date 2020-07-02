@@ -12,6 +12,8 @@ from astropy import table
 from datetime import datetime, timedelta
 from os import walk
 
+from wk import hydrocolor as hc
+
 # Get the data folder from the command line
 calibration_folder, *folders = io.path_from_input(argv)
 pattern = calibration_folder.stem
@@ -33,16 +35,12 @@ for folder_main in folders:
             continue
 
         # Load data
-        water_path, sky_path, card_path = [data_path/(photo + ".JPG") for photo in ("water", "sky", "greycard")]
-        water_jpeg = io.load_jpg_image(water_path)
-        sky_jpeg = io.load_jpg_image(sky_path)
-        card_jpeg = io.load_jpg_image(card_path)
+        water_path, sky_path, card_path = hc.generate_paths(data_path, ".JPG")
+        water_jpeg, sky_jpeg, card_jpeg = hc.load_jpeg_images(water_path, sky_path, card_path)
         print("Loaded JPEG data")
 
         # Load EXIF data
-        water_exif = io.load_exif(water_path)
-        sky_exif = io.load_exif(sky_path)
-        card_exif = io.load_exif(card_path)
+        water_exif, sky_exif, card_exif = hc.load_exif(water_path, sky_path, card_path)
 
         # Select the central 100x100 pixels
         central_x, central_y = water_jpeg.shape[0]//2, water_jpeg.shape[1]//2
@@ -66,35 +64,9 @@ for folder_main in folders:
         sky_all = [sky_jpeg, sky_cut]
         card_all = [card_jpeg, card_cut]
 
-        fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(9,4), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex="col", sharey="col")
-
-        for ax_col, water, sky, card in zip(axs.T[1:], water_all, sky_all, card_all):
-            data_combined = np.ravel([water, sky, card])
-            bins = np.linspace(0, 255, 100)
-
-            for ax, data in zip(ax_col, [water, sky, card]):
-                ax.hist(data.ravel(), bins=bins, color="k")
-                ax.set_xlim(0, 255)
-                ax.grid(True, ls="--", alpha=0.7)
-
-        for ax, image in zip(axs[:,0], [water_jpeg, sky_jpeg, card_jpeg]):
-            ax.imshow(image)
-            ax.tick_params(bottom=False, labelbottom=False)
-
-        for ax in axs.ravel():
-            ax.tick_params(left=False, labelleft=False)
-        for ax, label in zip(axs[:,0], ["Water", "Sky", "Grey card"]):
-            ax.set_ylabel(label)
-        for ax, title in zip(axs[0], ["Image", "JPEG (full)", "Central slice"]):
-            ax.set_title(title)
-
-        plt.savefig(data_path/"statistics_jpeg.pdf")
-        plt.show()
+        hc.histogram_jpeg(water_all, sky_all, card_all, saveto=data_path/"statistics_jpeg.pdf")
 
         # Convert to remote sensing reflectances
-        def R_RS(L_t, L_s, L_c, rho=0.028, R_ref=0.18):
-            return (L_t - rho * L_s) / ((np.pi / R_ref) * L_c)
-
         water_mean = water_cut.mean(axis=(0,1))
         sky_mean = sky_cut.mean(axis=(0,1))
         card_mean = card_cut.mean(axis=(0,1))
@@ -103,52 +75,29 @@ for folder_main in folders:
         water_std = water_cut.std(axis=(0,1))
         sky_std = sky_cut.std(axis=(0,1))
         card_std = card_cut.std(axis=(0,1))
+        print("Calculated standard deviations per channel")
 
-        R_rs = R_RS(water_mean, sky_mean, card_mean)
+        R_rs = hc.R_RS(water_mean, sky_mean, card_mean)
         print("Calculated remote sensing reflectances")
 
-        R_rs_err_water = water_std**2 * ((0.18/np.pi) * card_mean**-1)**2
-        R_rs_err_sky = sky_std**2 * ((0.18/np.pi) * 0.028 * card_mean**-1)**2
-        R_rs_err_card = card_std**2 * ((0.18/np.pi) * (water_mean - 0.028 * sky_mean) * card_mean**-2)**2
-
-        R_rs_err = np.sqrt(R_rs_err_water + R_rs_err_sky + R_rs_err_card)
+        R_rs_err = hc.R_RS_error(water_mean, sky_mean, card_mean, water_std, sky_std, card_std)
         print("Calculated error in remote sensing reflectances")
 
         for R, R_err, c in zip(R_rs, R_rs_err, "RGB"):
             print(f"{c}: R_rs = {R:.3f} +- {R_err:.3f} sr^-1")
 
         # Find the effective wavelength corresponding to the RGB bands
-        spectral_response = calibrate.load_spectral_response(calibration_folder)
-        wavelengths = spectral_response[0]
-        RGB_responses = spectral_response[1:4]
-        RGB_wavelengths = spectral.effective_wavelengths(wavelengths, RGB_responses)
+        RGB_wavelengths = hc.effective_wavelength(calibration_folder)
 
         # SPECTACLE function for effective bandwidth is currently somewhat broken so we
         # do it ourselves
-        RGB_responses_normalised = RGB_responses / RGB_responses.max(axis=1)[:,np.newaxis]
-        effective_bandwidths = np.trapz(RGB_responses_normalised, x=wavelengths, axis=1)
+        effective_bandwidths = hc.effective_bandwidth(calibration_folder)
 
-        plt.figure(figsize=(3,3), tight_layout=True)
-        for j, c in enumerate("rgb"):
-            plt.errorbar(RGB_wavelengths[j], R_rs[j], xerr=effective_bandwidths[j]/2, yerr=R_rs_err[j], c=c, fmt="o")
-        plt.xlabel("Wavelength [nm]")
-        plt.ylabel("Remote sensing reflectance [sr$^{-1}$]")
-        plt.xlim(390, 700)
-        plt.ylim(0, 0.05)
-        plt.yticks([0, 0.01, 0.02, 0.03, 0.04, 0.05])
-        plt.grid(ls="--")
-        plt.show()
+        # Plot the result
+        hc.plot_R_rs(RGB_wavelengths, R_rs, effective_bandwidths, R_rs_err)
 
         # Create a timestamp from EXIF (assume time zone UTC+2)
-        timestamp = water_exif["EXIF DateTimeOriginal"].values
-        # Convert to ISO format
-        timestamp_ISO = timestamp[:4] + "-" + timestamp[5:7] + "-" + timestamp[8:10] + "T" + timestamp[11:]
-        UTC = datetime.fromisoformat(timestamp_ISO)
-        UTC = UTC - conversion_to_utc
+        UTC = hc.UTC_timestamp(water_exif)
 
         # Write the result to file
-        result = table.Table(rows=[[UTC.timestamp(), UTC.isoformat(), *R_rs, *R_rs_err]], names=["UTC", "UTC (ISO)", "R_rs (R)", "R_rs (G)", "R_rs (B)", "R_rs_err (R)", "R_rs_err (G)", "R_rs_err (B)"])
-        save_to = data_path.parent / (data_path.stem + "_jpeg.csv")
-        result.write(save_to, format="ascii.fast_csv")
-
-        print(f"Saved results to {save_to}")
+        hc.write_R_rs(UTC, R_rs, R_rs_err, saveto=data_path.parent / (data_path.stem + "_jpeg.csv"))
