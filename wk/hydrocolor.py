@@ -165,8 +165,8 @@ def plot_R_rs(RGB_wavelengths, R_rs, effective_bandwidths, R_rs_err, saveto=None
     plt.xlabel("Wavelength [nm]")
     plt.ylabel("Remote sensing reflectance [sr$^{-1}$]")
     plt.xlim(390, 700)
-    plt.ylim(0, 0.05)
-    plt.yticks([0, 0.01, 0.02, 0.03, 0.04, 0.05])
+    plt.ylim(0, 0.1)
+    plt.yticks(np.arange(0, 0.12, 0.02))
     plt.grid(ls="--")
     if saveto is not None:
         plt.savefig(saveto, bbox_inches="tight")
