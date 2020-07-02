@@ -87,36 +87,48 @@ data_sorad = []
 
 for row in table_phone:
     time_differences = np.abs(table_sorad["UTC"] - row["UTC"])
-    closest = time_differences.argmin()
-    time_diff = time_differences[closest]
-    if time_diff > 1000:
+    close_enough = np.where((time_differences <= 60) & (table_sorad["valid"] == "1"))[0]
+    if not len(close_enough):
         continue
-    phone_time = datetime.fromtimestamp(row['UTC']).isoformat()
-    sorad_time = datetime.fromtimestamp(table_sorad[closest]["UTC"]).isoformat()
-    print("----")
-    print(f"Phone time: {phone_time} ; SoRad time: {sorad_time} ; Difference: {time_diff:.1f} seconds")
-    print(f"Valid: {table_sorad[closest]['valid']} ; offset: {table_sorad[closest]['offset']}")
 
-    Rrs = np.array([table_sorad[f"Rrs_{wvl:.1f}"][closest] for wvl in wavelengths])
+    print("----")
+    Rrs_all = np.array([table_sorad[f"Rrs_{wvl:.1f}"][close_enough] for wvl in wavelengths]).T
+
+    Rrs_mean = Rrs_all.mean(axis=0)
+    Rrs_std = Rrs_all.std(axis=0)
+    print(np.nanmean(Rrs_std))
+    Rrs_err = Rrs_std# / np.sqrt(Rrs_all.shape[0])
+
+    Rrs_avg_all = np.stack([table_sorad[close_enough][f"Rrs_avg ({c})"] for c in "RGB"]).T
+    Rrs_avg_mean = Rrs_avg_all.mean(axis=0)
+    Rrs_avg_std = Rrs_avg_all.std(axis=0)
+    Rrs_avg_err = Rrs_avg_std# / np.sqrt(Rrs_avg_all.shape[0])
+
+    phone_time = datetime.fromtimestamp(row['UTC']).isoformat()
+    sorad_time = np.array([datetime.fromtimestamp(time).isoformat() for time in table_sorad[close_enough]["UTC"]])
+    print(f"Phone time: {phone_time} ; SoRad time: {sorad_time[0]} -- {sorad_time[-1]}")
 
     plt.figure(figsize=(3.3,3.3), tight_layout=True)
-    plt.plot(wavelengths, Rrs, c="k")
+    for Rrs in Rrs_all:
+        plt.plot(wavelengths, Rrs, c="k", alpha=0.2)
+    plt.plot(wavelengths, Rrs_mean, c="k")
     for j, c in enumerate("RGB"):
         plt.errorbar(RGB_wavelengths[j], row[f"R_rs ({c})"], xerr=effective_bandwidths[j]/2, yerr=row[f"R_rs_err ({c})"], fmt="o", c=c)
-        plt.errorbar(RGB_wavelengths[j], table_sorad[closest][f"Rrs_avg ({c})"], xerr=effective_bandwidths[j]/2, yerr=0, fmt="^", c=c)
+        #plt.errorbar(RGB_wavelengths[j], Rrs_avg_mean[j], xerr=effective_bandwidths[j]/2, yerr=Rrs_avg_err[j], fmt="^", c=c)
     plt.grid(True, ls="--")
     plt.xlim(200, 900)
     plt.xlabel("Wavelength [nm]")
-    plt.ylim(0, 0.15)
+    plt.ylim(0, 0.055)
     plt.ylabel("$R_{rs}$ [sr$^{-1}$]")
     plt.title(f"{phone_name}\n{phone_time}")
+    phone_time = phone_time.replace(":", "_")
     plt.savefig(f"SoRad_comparison/{phone_name}_{phone_time}.pdf")
-    plt.show()
+    #plt.show()
     plt.close()
 
-    data_phone.append(row)
-    data_sorad.append(table_sorad[closest])
-
+#    data_phone.append(row)
+#    data_sorad.append(table_sorad[closest])
+#raise Exception
 data_phone = table.vstack(data_phone)
 data_sorad = table.vstack(data_sorad)
 
@@ -140,4 +152,4 @@ plt.xlabel("SoRad $R_{rs}$ [sr$^{-1}$]")
 plt.ylabel(phone_name + " $R_{rs}$ [sr$^{-1}$]")
 plt.title(f"$r$ = {r:.2f}     RMS = {rms:.2f} sr$" + "^{-1}$")
 plt.savefig(f"comparison_SoRad_X_{phone_name}.pdf")
-plt.show()
+#plt.show()
