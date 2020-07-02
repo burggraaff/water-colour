@@ -75,7 +75,7 @@ def central_slice_raw(*images, size=box_size):
 
 
 def histogram_raw(water_data, sky_data, card_data, saveto):
-    fig, axs = plt.subplots(nrows=3, ncols=5, figsize=(11,4), gridspec_kw={"hspace": 0, "wspace": 0}, sharex="col", sharey="col")
+    fig, axs = plt.subplots(nrows=3, ncols=5, figsize=(11,4), gridspec_kw={"hspace": 0.04, "wspace": 0.04}, sharex="col", sharey="col")
 
     for ax_col, water, sky, card in zip(axs[:,1:].T, water_data[1:], sky_data[1:], card_data[1:]):
         data_combined = np.ravel([water, sky, card])
@@ -92,6 +92,8 @@ def histogram_raw(water_data, sky_data, card_data, saveto):
         ax.tick_params(bottom=False, labelbottom=False)
     for ax in axs.ravel():
         ax.tick_params(left=False, labelleft=False)
+    for ax in axs[:2].ravel():
+        ax.tick_params(bottom=False, labelbottom=False)
     for ax, label in zip(axs[:,0], ["Water", "Sky", "Grey card"]):
         ax.set_ylabel(label)
     for ax, title in zip(axs[0], ["Image", "Raw", "Bias-corrected", "Flat-fielded", "Central slice"]):
@@ -105,7 +107,7 @@ def histogram_raw(water_data, sky_data, card_data, saveto):
 
 
 def histogram_jpeg(water_data, sky_data, card_data, saveto):
-    fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(9,4), tight_layout=True, gridspec_kw={"hspace": 0, "wspace": 0}, sharex="col", sharey="col")
+    fig, axs = plt.subplots(nrows=3, ncols=3, figsize=(9,4), gridspec_kw={"hspace": 0.04, "wspace": 0.04}, sharex="col", sharey="col")
 
     for ax_col, water, sky, card in zip(axs.T[1:], water_data, sky_data, card_data):
         bins = np.linspace(0, 255, 100)
@@ -121,6 +123,8 @@ def histogram_jpeg(water_data, sky_data, card_data, saveto):
 
     for ax in axs.ravel():
         ax.tick_params(left=False, labelleft=False)
+    for ax in axs[:2].ravel():
+        ax.tick_params(bottom=False, labelbottom=False)
     for ax, label in zip(axs[:,0], ["Water", "Sky", "Grey card"]):
         ax.set_ylabel(label)
     for ax, title in zip(axs[0], ["Image", "JPEG (full)", "Central slice"]):
