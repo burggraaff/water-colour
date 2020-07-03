@@ -74,7 +74,7 @@ def central_slice_raw(*images, size=box_size):
     return images_cut
 
 
-def histogram_raw(water_data, sky_data, card_data, saveto):
+def histogram_raw(water_data, sky_data, card_data, saveto, camera=None):
     fig, axs = plt.subplots(nrows=3, ncols=5, figsize=(11,4), gridspec_kw={"hspace": 0.04, "wspace": 0.04}, sharex="col", sharey="col")
 
     for ax_col, water, sky, card in zip(axs[:,1:].T, water_data[1:], sky_data[1:], card_data[1:]):
@@ -84,6 +84,19 @@ def histogram_raw(water_data, sky_data, card_data, saveto):
 
         for ax, data in zip(ax_col, [water, sky, card]):
             ax.hist(data.ravel(), bins=bins, color="k")
+
+            if camera is not None:
+                # If the data are already in RGBG format, use them
+                if len(data.shape) == 3:
+                    data_RGBG = data
+                # If not, then demosaick the data
+                else:
+                    data_RGBG = camera.demosaick(data)
+
+                data_RGB = RGBG2_to_RGB(data_RGBG)[0]
+                for j, c in enumerate("rgb"):
+                    ax.hist(data_RGB[j].ravel(), bins=bins, color=c, histtype="step")
+
             ax.set_xlim(xmin, xmax)
             ax.grid(True, ls="--", alpha=0.7)
 

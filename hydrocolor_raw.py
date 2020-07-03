@@ -74,7 +74,7 @@ for folder_main in folders:
         sky_all = [sky_jpeg, sky_raw, sky_bias, sky_flat, sky_cut]
         card_all = [card_jpeg, card_raw, card_bias, card_flat, card_cut]
 
-        hc.histogram_raw(water_all, sky_all, card_all, saveto=data_path/"statistics_raw.pdf")
+        hc.histogram_raw(water_all, sky_all, card_all, camera=camera, saveto=data_path/"statistics_raw.pdf")
 
         # Flatten lists and combine G and G2
         water_RGB, sky_RGB, card_RGB = hc.RGBG2_to_RGB(water_cut, sky_cut, card_cut)
