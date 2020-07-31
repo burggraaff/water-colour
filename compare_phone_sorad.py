@@ -13,7 +13,7 @@ Requires the following SPECTACLE calibrations:
 import numpy as np
 from sys import argv
 from matplotlib import pyplot as plt
-from spectacle import io, calibrate, spectral
+from spectacle import io, calibrate, spectral, load_camera
 from spectacle.general import RMS
 from astropy import table
 from datetime import datetime
@@ -21,6 +21,10 @@ from datetime import datetime
 # Get the data folder from the command line
 path_calibration, path_phone, path_sorad = io.path_from_input(argv)
 phone_name = " ".join(path_phone.stem.split("_")[1:-1])
+
+# Get Camera object
+camera = load_camera(path_calibration)
+print(f"Loaded Camera object:\n{camera}")
 
 # Find the effective wavelength corresponding to the RGB bands
 spectral_response = calibrate.load_spectral_response(path_calibration)

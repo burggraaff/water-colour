@@ -13,7 +13,7 @@ Requires the following SPECTACLE calibrations:
 import numpy as np
 from sys import argv
 from matplotlib import pyplot as plt
-from spectacle import io, calibrate, analyse, spectral
+from spectacle import io, load_camera
 from astropy import table
 from datetime import datetime, timedelta
 from os import walk
@@ -24,9 +24,9 @@ from wk import hydrocolor as hc
 calibration_folder, *folders = io.path_from_input(argv)
 pattern = calibration_folder.stem
 
-# Get metadata
-camera = io.load_metadata(calibration_folder)
-print("Loaded metadata")
+# Get Camera object
+camera = load_camera(calibration_folder)
+print(f"Loaded Camera object:\n{camera}")
 
 # ISO speed and exposure time are assumed equal between all three images and
 # thus can be ignored
@@ -39,7 +39,7 @@ for folder_main in folders:
             continue
 
         # Load data
-        water_path, sky_path, card_path = hc.generate_paths(data_path, camera.image.raw_extension)
+        water_path, sky_path, card_path = hc.generate_paths(data_path, camera.raw_extension)
         water_raw, sky_raw, card_raw = hc.load_raw_images(water_path, sky_path, card_path)
         print("Loaded RAW data")
 
@@ -51,7 +51,7 @@ for folder_main in folders:
         print("Created JPEG thumbnails")
 
         # Correct for bias
-        water_bias, sky_bias, card_bias = calibrate.correct_bias(calibration_folder, water_raw, sky_raw, card_raw)
+        water_bias, sky_bias, card_bias = camera.correct_bias(water_raw, sky_raw, card_raw)
         print("Corrected bias")
 
         # Normalising for ISO speed is not necessary since this is a relative measurement
@@ -59,7 +59,7 @@ for folder_main in folders:
         # Dark current is negligible
 
         # Correct for flat-field
-        water_flat, sky_flat, card_flat = calibrate.correct_flatfield(calibration_folder, water_bias, sky_bias, card_bias)
+        water_flat, sky_flat, card_flat = camera.correct_flatfield(water_bias, sky_bias, card_bias)
         print("Corrected flat-field")
 
         # Demosaick the data

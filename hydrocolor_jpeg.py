@@ -7,7 +7,7 @@ HydroColor protocol.
 import numpy as np
 from sys import argv
 from matplotlib import pyplot as plt
-from spectacle import io, calibrate, spectral
+from spectacle import io, load_camera
 from astropy import table
 from datetime import datetime, timedelta
 from os import walk
@@ -20,9 +20,9 @@ pattern = calibration_folder.stem
 
 conversion_to_utc = timedelta(hours=2)
 
-# Get metadata
-camera = io.load_metadata(calibration_folder)
-print("Loaded metadata")
+# Get Camera object
+camera = load_camera(calibration_folder)
+print(f"Loaded Camera object:\n{camera}")
 
 # ISO speed and exposure time are assumed equal between all three images and
 # thus can be ignored
