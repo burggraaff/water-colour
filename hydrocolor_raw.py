@@ -31,6 +31,13 @@ print(f"Loaded Camera object:\n{camera}")
 # ISO speed and exposure time are assumed equal between all three images and
 # thus can be ignored
 
+# Load effective spectral bandwidths
+camera.load_spectral_bands()
+effective_bandwidths = camera.spectral_bands[:3]
+
+# Find the effective wavelength corresponding to the RGB bands
+RGB_wavelengths = hc.effective_wavelength(calibration_folder)
+
 for folder_main in folders:
     for tup in walk(folder_main):
         folder = io.Path(tup[0])
@@ -98,13 +105,6 @@ for folder_main in folders:
 
         for R, R_err, c in zip(R_rs, R_rs_err, "RGB"):
             print(f"{c}: R_rs = {R:.3f} +- {R_err:.3f} sr^-1")
-
-        # Find the effective wavelength corresponding to the RGB bands
-        RGB_wavelengths = hc.effective_wavelength(calibration_folder)
-
-        # SPECTACLE function for effective bandwidth is currently somewhat broken so we
-        # do it ourselves
-        effective_bandwidths = hc.effective_bandwidth(calibration_folder)
 
         # Plot the result
         hc.plot_R_rs(RGB_wavelengths, R_rs, effective_bandwidths, R_rs_err)
