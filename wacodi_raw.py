@@ -92,36 +92,16 @@ for folder_main in folders:
         sky_hue = np.rad2deg(np.arctan2(sky_xy[1]-1/3, sky_xy[0]-1/3) % (2*np.pi))
         card_hue = np.rad2deg(np.arctan2(card_xy[1]-1/3, card_xy[0]-1/3) % (2*np.pi))
 
+        # Histogram of hue angle
+        hue_mean = np.mean(water_hue)
+        hue_error = np.std(water_hue) #/ np.sqrt(water_hue.size)
+        plt.hist(water_hue.ravel(), bins=50)
+        plt.title(f"Mean $= {hue_mean:.0f} \pm {hue_error:.0f}$ degrees")
+        plt.xlabel("Hue angle [degrees]")
+        plt.show()
+        plt.close()
+
         raise Exception
-
-        # Flatten lists and combine G and G2
-        water_RGB, sky_RGB, card_RGB = hc.RGBG2_to_RGB(water_cut, sky_cut, card_cut)
-
-        water_mean = np.array([rgb.mean() for rgb in water_RGB])
-        sky_mean = np.array([rgb.mean() for rgb in sky_RGB])
-        card_mean = np.array([rgb.mean() for rgb in card_RGB])
-        print("Calculated mean values per channel")
-
-        water_std = np.array([rgb.std() for rgb in water_RGB])
-        sky_std = np.array([rgb.std() for rgb in sky_RGB])
-        card_std = np.array([rgb.std() for rgb in card_RGB])
-        print("Calculated standard deviations per channel")
-
-        # Convert to remote sensing reflectances
-        R_rs = hc.R_RS(water_mean, sky_mean, card_mean)
-        print("Calculated remote sensing reflectances")
-
-        R_rs_err = hc.R_RS_error(water_mean, sky_mean, card_mean, water_std, sky_std, card_std)
-        print("Calculated error in remote sensing reflectances")
-
-        for R, R_err, c in zip(R_rs, R_rs_err, "RGB"):
-            print(f"{c}: R_rs = {R:.3f} +- {R_err:.3f} sr^-1")
-
-        # Plot the result
-        hc.plot_R_rs(RGB_wavelengths, R_rs, effective_bandwidths, R_rs_err)
 
         # Create a timestamp from EXIF (assume time zone UTC+2)
         UTC = hc.UTC_timestamp(water_exif)
-
-        # Write the result to file
-        hc.write_R_rs(UTC, R_rs, R_rs_err, saveto=data_path.parent / (data_path.stem + "_raw.csv"))
