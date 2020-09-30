@@ -11,7 +11,7 @@ Requires the following SPECTACLE calibrations:
 import numpy as np
 from sys import argv
 from matplotlib import pyplot as plt
-from spectacle import io, load_camera
+from spectacle import io, load_camera, spectral
 from astropy import table
 from datetime import datetime, timedelta
 from os import walk
@@ -77,10 +77,20 @@ for folder_main in folders:
 
         # hc.histogram_raw(water_all, sky_all, card_all, camera=camera, saveto=data_path/"statistics_raw.pdf")
 
+        water_RGB, sky_RGB, card_RGB = hc.RGBG2_to_RGB(water_cut, sky_cut, card_cut)
+
+        water_mean = np.array([rgb.mean() for rgb in water_RGB])
+        sky_mean = np.array([rgb.mean() for rgb in sky_RGB])
+        card_mean = np.array([rgb.mean() for rgb in card_RGB])
+        print("Calculated mean values per channel")
+
+        water_std = np.array([rgb.std() for rgb in water_RGB])
+        sky_std = np.array([rgb.std() for rgb in sky_RGB])
+        card_std = np.array([rgb.std() for rgb in card_RGB])
+        print("Calculated standard deviations per channel")
+
         # Convert RGB to XYZ
-        water_XYZ = np.einsum("ij,jxy->ixy", camera.XYZ_matrix, water_cut[:3])
-        sky_XYZ = np.einsum("ij,jxy->ixy", camera.XYZ_matrix, sky_cut[:3])
-        card_XYZ = np.einsum("ij,jxy->ixy", camera.XYZ_matrix, card_cut[:3])
+        water_XYZ, sky_XYZ, card_XYZ = camera.convert_to_XYZ(water_mean, sky_mean, card_mean)
 
         # Calculate xy chromaticity
         water_xy = (water_XYZ / water_XYZ.sum(axis=0))[:2]
@@ -91,17 +101,3 @@ for folder_main in folders:
         water_hue = np.rad2deg(np.arctan2(water_xy[1]-1/3, water_xy[0]-1/3) % (2*np.pi))
         sky_hue = np.rad2deg(np.arctan2(sky_xy[1]-1/3, sky_xy[0]-1/3) % (2*np.pi))
         card_hue = np.rad2deg(np.arctan2(card_xy[1]-1/3, card_xy[0]-1/3) % (2*np.pi))
-
-        # Histogram of hue angle
-        hue_mean = np.mean(water_hue)
-        hue_error = np.std(water_hue) #/ np.sqrt(water_hue.size)
-        plt.hist(water_hue.ravel(), bins=50)
-        plt.title(f"Mean $= {hue_mean:.0f} \pm {hue_error:.0f}$ degrees")
-        plt.xlabel("Hue angle [degrees]")
-        plt.show()
-        plt.close()
-
-        raise Exception
-
-        # Create a timestamp from EXIF (assume time zone UTC+2)
-        UTC = hc.UTC_timestamp(water_exif)
