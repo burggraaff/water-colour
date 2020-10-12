@@ -29,9 +29,6 @@ print(f"Loaded Camera object:\n{camera}")
 # ISO speed and exposure time are assumed equal between all three images and
 # thus can be ignored
 
-# Load the XYZ conversion matrix
-camera._load_XYZ_matrix()
-
 for folder_main in folders:
     for tup in walk(folder_main):
         folder = io.Path(tup[0])
