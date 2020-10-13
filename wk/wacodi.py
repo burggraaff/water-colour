@@ -41,3 +41,16 @@ def convert_xy_to_hue_angle(*xy_data):
         return hue_angle
     hue_angle_all = apply_to_multiple_args(_convert_single, xy_data)
     return hue_angle_all
+
+
+def convert_XYZ_error_to_hue_angle(XYZ_data, XYZ_error):
+    """
+    For a single XYZ vector and error vector, convert this to an error in hue angle
+    """
+    X,Y,Z = XYZ_data
+    Xerr, Yerr, Zerr = XYZ_error
+    ddX = (3*Z - 3*Y) / (5*X**2 - 2*X*(4*Y + Z) + 5*Y**2 - 2*Y*Z + 2*Z**2)
+    ddY = (3*X - 3*Z) / (5*X**2 - 2*X*(4*Y + Z) + 5*Y**2 - 2*Y*Z + 2*Z**2)
+    hue_err = np.sqrt(Xerr**2 * ddX**2 + Yerr**2 * ddY**2)  # Radians
+    hue_err = np.rad2deg(hue_err)
+    return hue_err
