@@ -25,7 +25,7 @@ from astropy import table
 from datetime import datetime, timedelta
 from os import walk
 
-from wk import hydrocolor as hc
+from wk import hydrocolor as hc, wacodi as wa
 
 # Get the data folder from the command line
 calibration_folder, *folders = io.path_from_input(argv)
@@ -122,16 +122,13 @@ for folder_main in folders:
 
         # Convert RGB to XYZ
         water_XYZ, sky_XYZ, card_XYZ = camera.convert_to_XYZ(water_mean, sky_mean, card_mean)
+        water_XYZ_err, sky_XYZ_err, card_XYZ_err = wa.convert_errors_to_XYZ(camera.XYZ_matrix, water_std, sky_std, card_std)
 
         # Calculate xy chromaticity
-        water_xy = (water_XYZ / water_XYZ.sum(axis=0))[:2]
-        sky_xy = (sky_XYZ / sky_XYZ.sum(axis=0))[:2]
-        card_xy = (card_XYZ / card_XYZ.sum(axis=0))[:2]
+        water_xy, sky_xy, card_xy = wa.convert_XYZ_to_xy(water_XYZ, sky_XYZ, card_XYZ)
 
         # Calculate hue angle
-        water_hue = np.rad2deg(np.arctan2(water_xy[1]-1/3, water_xy[0]-1/3) % (2*np.pi))
-        sky_hue = np.rad2deg(np.arctan2(sky_xy[1]-1/3, sky_xy[0]-1/3) % (2*np.pi))
-        card_hue = np.rad2deg(np.arctan2(card_xy[1]-1/3, card_xy[0]-1/3) % (2*np.pi))
+        water_hue, sky_hue, card_hue = wa.convert_xy_to_hue_angle(water_xy, sky_xy, card_xy)
 
         # Create a timestamp from EXIF (assume time zone UTC+2)
         UTC = hc.UTC_timestamp(water_exif)
